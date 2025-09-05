@@ -62,7 +62,7 @@ A production-ready microservices architecture for managing Categories, Products,
 ## ⚙️ Setup & Installation
 1. Clone the repo:
    ```bash
-   git clone https://github.com/your-username/ecom-microservices.git
+   git clone https://github.com/AmarjeetMahato/ecom-microservices.git
    cd ecom-microservices
 
 cd category-service && npm install
