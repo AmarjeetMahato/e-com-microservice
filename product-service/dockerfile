@@ -1,0 +1,63 @@
+# -----------------------------
+# 1. Build Stage
+# -----------------------------
+FROM node:20-alpine AS builder
+
+# Install deps for build tools
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+# Copy dependency files first (better caching)
+COPY package*.json ./
+
+# ✅ Copy drizzle config explicitly (before npm install)
+COPY ./drizzle.config.ts ./drizzle.config.ts
+
+# Use npm ci (more reliable & faster than npm install)
+# Add retries + registry mirror for stability
+RUN npm config set registry https://registry.npmmirror.com/ \
+    && npm set fetch-retries 5 \
+    && npm set fetch-retry-mintimeout 20000 \
+    && npm set fetch-retry-maxtimeout 120000 \
+    && npm ci --legacy-peer-deps
+
+# Copy source code
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+
+# -----------------------------
+# 2. Production Stage
+# -----------------------------
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Copy only package.json + lock
+COPY package*.json ./
+
+# ✅ Copy drizzle config explicitly (before npm install)
+COPY ./drizzle.config.ts ./drizzle.config.ts
+
+# Install only production dependencies
+RUN npm config set registry https://registry.npmmirror.com/ \
+    && npm ci --omit=dev --legacy-peer-deps
+
+# Copy built dist files from builder
+COPY --from=builder /app/dist ./dist
+
+# 🔹 Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Environment & ports
+ENV PORT=3001
+EXPOSE 3001
+
+# Start app
+
+# 🔹 Use entrypoint instead of CMD
+ENTRYPOINT ["/app/entrypoint.sh"]

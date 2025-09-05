@@ -1,0 +1,95 @@
+version: "3.9"
+
+services:
+  category-service:
+    build:
+      context: ./category-service
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${CATEGORY_DATABASE_URL}
+    depends_on:
+      - db
+    networks:
+      - app-network 
+    volumes:
+      - ./category-service/src/migrations:/app/src 
+      - ./category-service/package.json:/app/package.json
+      - ./category-service/tsconfig.json:/app/tsconfig.json
+      - ./category-service/.env:/app/.env:ro  
+
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - DATABASE_URL=${PRODUCT_DATABASE_URL}
+    depends_on:
+      - db
+    networks:
+      - app-network
+    volumes:
+      - ./product-service/src/migrations:/app/src  
+      - ./product-service/.env:/app/.env:ro 
+      - ./product-service/package.json:/app/package.json
+      - ./product-service/tsconfig.json:/app/tsconfig.json  
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - category-service
+      - product-service
+    networks:
+      - app-network  
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+    ports:
+      - "5432:5432"  
+      
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8080:80"   # Access pgAdmin in browser via localhost:8080
+    depends_on:
+      - db
+    networks:
+      - app-network 
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    command: ["redis-server", "--appendonly", "yes"]        
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db_data:
+  redis_data:
